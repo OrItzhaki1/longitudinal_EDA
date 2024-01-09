@@ -1,0 +1,146 @@
+DeathReason,Parsing
+"1a) intraventricular haemorrhage, 1b) cerebellar metastasis, 1c) lung cancer",Progressive disease
+"1a, intraventricular haemorrhage, 1b, cerebellar metastasis, 1c, lung cancer",Progressive disease
+"1a, pneumonia, 2, metastatic lung cancer, ischemic heart disease, vascular dementia",PossibleAE
+"1a. bronchopnumonia, 1b. lung carcinoma",PossibleAE
+"22/01/2019 hospitalization in wolfson with respiratory distress, double-sided pe - anesthetized and resuscitated. continued treatment in wolfson",Unknown
+aborted side effects; pat. died,PossibleAE
+acute blood loss,PossibleAE
+acute myocardial infarction,PossibleAE
+acute renal failure,PossibleAE
+acute right heart failure in pulmonary arterial hypertension in the context of malignancy-associated recurrent thromboembolic events,Progressive disease
+adenocarcinoma of the lung,Progressive disease
+adenocarcinoma of the lung with extensive plueral adrenal and bone metastasis,Progressive disease
+"although on palliative support, the death wasn't imminent, so cause of death not recorded as due to cancer progression. probably to be referred to the coroner",Unknown
+aspiration pneumonia,PossibleAE
+biopsy on 28/07/2021 confirmed poorly differentiated carcinoma from indefinite tumor origin. death date 03/08/2021,Progressive disease
+brain progressive disease,Progressive disease
+cancer,Progressive disease
+cancer progression,Progressive disease
+cancer progression vs. episodes of hypotension r/t heart issue,Progressive disease
+carcinoma of lung,Progressive disease
+carcinoma of the lung,Progressive disease
+carcinomatosis caused by carcinoma of the lung,Progressive disease
+cardiogenic shock,PossibleAE
+cause of death unknown,Unknown
+"cause of death unknown, patient not treated at roswell",Unknown
+chest infection,PossibleAE
+clinical progression,Progressive disease
+complications due to nsclc,Progressive disease
+covid + per hospital record dos 9-22-22,COVID
+covid-19,COVID
+cva,PossibleAE
+data is missing,Unknown
+dead from other ca or complications of ca,Progressive disease
+dead from this ca or complications of ca,Progressive disease
+death because the disease,Progressive disease
+death before 1st restaging (presumably due to further tumor progression),Unknown
+"death due to pneumonitis/drug toxicity, no disease progression - verified by ct and oncologist",Toxicity
+"died after 1 treatment, reason not specified",Unknown
+died at home - unknown,Unknown
+died due to disease progression,Progressive disease
+disease,Progressive disease
+disease progression,Progressive disease
+due to disease progression,Progressive disease
+due to lymphoma progression,Progressive disease
+"dyspnea and diarrhea pd. progression disease , it is mentioned in the pi summery that : a ct was conducted in 7.3.23- which showed a clear pd",PossibleAE
+extensive sclc,Progressive disease
+general deterioration,Progressive disease
+hemoptysis,PossibleAE
+hypovolemic shock,PossibleAE
+"immunotherapy recommended, unknown if administered, transferred care. uk reason of death",Unknown
+infection and multiorgan failure,PossibleAE
+intracerebral hemorrhage,PossibleAE
+"intraparenchymal haemorrhage - pulmonary emboli treated with anticoagulants, progressive metastatic nsclc",PossibleAE
+ischemic colitis,PossibleAE
+low saturation and atrial fibrillation,PossibleAE
+lower respiratory tract infection and metastatic nsclc,PossibleAE
+lung adenocarcinoma,Progressive disease
+lung adenocarcinoma with bone metastasis,Progressive disease
+lung cancer,Progressive disease
+lung cancer with cerebral metastases,Progressive disease
+lung carcinoma,Progressive disease
+lung collapse on oesophagus,Progressive disease
+malignant melanoma and sepsis,PossibleAE
+malignant neoplasm of pleura,Progressive disease
+melanoma,Progressive disease
+metastatic lung cancer,Progressive disease
+metastatic lung cancer and ischaemic heart disease,PossibleAE
+metastatic lung carcinoma,Progressive disease
+metastatic malignant melanoma,Progressive disease
+metastatic melanoma,Progressive disease
+metastatic non small cell lung cancer (adenocarcinoma),Progressive disease
+multiorgan failure,Progressive disease
+multi-organ failure due to metastatic lung adenocarcinoma,Progressive disease
+na,Unknown
+neurological deterioration,PossibleAE
+neutropenic sepsis,PossibleAE
+no data,Unknown
+not available yet,Unknown
+not documented/unknown,Unknown
+not known,Unknown
+not reported,Unknown
+not specified,Unknown
+not specified died before orr,Unknown
+not specify,Unknown
+nsclc,Progressive disease
+oesophageal cancer,Progressive disease
+patient died due to disease,Progressive disease
+"patient has visited treating physician on 20jan21, and evaluated as sd according to ct performed on 12jan21, it was realised that patient has died on 21jan21 in a different site for an unknown reason",Unknown
+"patient last seen in clinic 12 feb 2012, die in 9 jul 2012 reason not specify",Unknown
+"patient last visit at smilow 10/18/2018, patient die in 18 nov 2018 reason not specified",Unknown
+"patient treatment occurred at outside facility, dead from this ca or complications of ca",Progressive disease
+pd,Progressive disease
+pd on 25.3.2021  transferred to hospice care. death 13.6.2021,Unknown
+pd(ncsll) +copd,Progressive disease
+perimyocarditis,PossibleAE
+pneumocystis pneumonia,PossibleAE
+pneumonia,PossibleAE
+pneumonia on background of lung cancer,PossibleAE
+presumed cancer progression as patient had been discharged to best supportive care. unable to access gp or community records,Unknown
+"probably lung cancer, but death was not in sheb",Unknown
+"probably lung cancer, but death was not in sheba (poor prognosis at last visit in sheb",Unknown
+"probably lung cancer, but death was�����",Unknown
+"probably lung cancer, but death was������not in sheba������(poor p",Unknown
+progression disease,Progressive disease
+progression of cancer,Progressive disease
+progression of disease,Progressive disease
+progression of disease - malignant melanoma,Progressive disease
+progressive disease,Progressive disease
+progressive metastatic melanoma,Progressive disease
+progressive scc lung,Progressive disease
+reason is not specify (but the patient is pd),Unknown
+renal failure,PossibleAE
+respiratory failure,Progressive disease
+respiratory infections and ulcers,PossibleAE
+right hemispheric  parenchymal haematoma,Progressive disease
+sclc with mets and covid-19 pneumonitis,COVID
+sepsis,PossibleAE
+severe covid infection,COVID
+small cell carcinoma of lung,Progressive disease
+small cell lung carcinoma,Progressive disease
+stroke,PossibleAE
+sudden cardiac death,PossibleAE
+"sudden general deterioration, anemia, fatigue and weakness",Progressive disease
+t = tumor dependent,Progressive disease
+"t = tumor dependent, (no orr has been done)",Progressive disease
+t = tumor dependent. also the patient didn't receive immunotherapy at all there for not eligible (according to update info from the blood bank),Progressive disease
+t= tumor dependent,Progressive disease
+the patient refused to attend any treatment or visit. death date 01/09/2019,Unknown
+"the patient was admitted to another hospital, we have no access to data on his death",Unknown
+the patient was hospitalized on 10.11.20 due to dyspnea  and bloody cough ���������.?   and died on 13.11.20 due ,PossibleAE
+the patient was hospitalized on 10.11.20 due to dyspnea  and bloody cough ….?   and died on 13.11.20 due far advanced lung canc,PossibleAE
+tumor,Progressive disease
+tumor associated death,Progressive disease
+tumor dependent,Progressive disease
+tumor independent,Unknown
+"tumor, died without evidence of pd",Unknown
+"tumor, pat. died, final therapy external",PossibleAE
+tumor-related,Progressive disease
+uk,Unknown
+unable to verify as patient died at home and there is no gp record information,Unknown
+unk,Unknown
+unknown,Unknown
+unknown - died in ambulance on route to hospital,Unknown
+unknown. patient did not receive treatment  between 17/8/2020  - 1/10/2020 due to covid- 19,Unknown
+will update once we received replied from gp,Unknown
