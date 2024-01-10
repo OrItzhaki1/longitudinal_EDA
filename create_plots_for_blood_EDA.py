@@ -58,28 +58,27 @@ def get_progression(clin_dict, full_data):
 
 if __name__ == "__main__":
     clin_dict = pd.read_excel(INPUT_PATH, sheet_name=None)
-    blood_df, treatment_df = parse_blood(clin_dict)
+    original_blood_df, treatment_df = parse_blood(clin_dict)
     # filter:
-    blood_df = blood_df[blood_df['Indication'] == 'NSCLC']
-    blood_df = blood_df[blood_df['BloodCollectionDate'] != 'Not Done']
+    original_blood_df = original_blood_df[original_blood_df['Indication'] == 'NSCLC']
+    blood_df = original_blood_df[original_blood_df['BloodCollectionDate'] != 'Not Done']
     # sort:
     blood_df = blood_df.sort_values(['SubjectId', 'BloodCollectionDate'])
-
-    # print(blood_df.columns)
-    # blood_df.to_excel('blood_df.xlsx')
-    # with open("ids_blood.txt", 'w') as file:
-    #     for item in blood_df['SubjectId'].unique():
-    #         print(item, file=file)
 
     #### create summary df
     blood_summary_df = blood_df['SubjectId'].drop_duplicates()
     # get first treatment info:
-    first_trt = blood_df[(blood_df['Visit'] == 'PRE') & (blood_df['TreatmentDate'].notna())]
+    first_trt = original_blood_df[(original_blood_df['Visit'] == 'PRE') & (original_blood_df['TreatmentDate'].notna())]
     first_trt = first_trt[['SubjectId', 'TreatmentDate']]
     blood_summary_df = pd.merge(blood_summary_df, first_trt, on='SubjectId', how='left')
+    # get t0 blood collection info:
+    first_blood = blood_df[(blood_df['Visit'] == 'PRE') & (blood_df['BloodCollectionDate'].notna())]
+    first_blood = first_blood[['SubjectId', 'BloodCollectionDate']]
+    blood_summary_df = pd.merge(blood_summary_df, first_blood, on='SubjectId', how='left')
     # get progression info:
     blood_summary_df = get_progression(clin_dict, blood_summary_df)
-    blood_summary_df.rename(columns={'TreatmentDate': 'FirstTreatmentDate', 'PFSDate': 'ProgressionDate'}, inplace=True)
+    blood_summary_df.rename(columns={'TreatmentDate': 'FirstTreatmentDate', 'PFSDate': 'ProgressionDate',
+                                     'BloodCollectionDate': 'T0Date'}, inplace=True)
 
     # histogram of number of blood samples
     print("According to current NSCLC data from 24.12.23:")
@@ -97,9 +96,9 @@ if __name__ == "__main__":
     plt.savefig('plots/sample_distribution.png')
 
     # new histogram with cleaned patients with less than two blood samples and no first treatment found
-    # filter for no treatment dates
-    have_trt_ids = blood_summary_df.loc[blood_summary_df['FirstTreatmentDate'].notna(), 'SubjectId']
-    filtered_blood_df = blood_df[blood_df['SubjectId'].isin(have_trt_ids)]
+    # filter for no treatment or t0 dates
+    ids_to_keep = blood_summary_df.loc[(blood_summary_df['FirstTreatmentDate'].notna()) & (blood_summary_df['T0Date'].notna()), 'SubjectId']
+    filtered_blood_df = blood_df[blood_df['SubjectId'].isin(ids_to_keep)]
     # filter for at least two samples
     sample_counts_filtered = filtered_blood_df['SubjectId'].value_counts()
     sample_counts_filtered = sample_counts_filtered[sample_counts_filtered >= 2]
@@ -125,12 +124,11 @@ if __name__ == "__main__":
     blood_summary_df['HasT1'] = False
     blood_summary_df['T1Date'] = None
     blood_summary_df['IsTprogAlsoT1'] = False
-    filtered_blood_df['IsT0'] = False   # todo: how to classify??
+    filtered_blood_df['IsT0'] = False   # todo: assign
     filtered_blood_df['IsT1'] = False   # todo: assign
     filtered_blood_df['IsTprog'] = False   # todo: assign
 
     blood_summary_df.set_index('SubjectId', inplace=True)
-    # ix = blood_summary_df['SubjectId'].isin(filtered_blood_df['SubjectId'])
     ix = blood_summary_df.index.isin(filtered_blood_df['SubjectId'])
     blood_summary_df.loc[ix, 'PassedFilter'] = True
 
@@ -150,14 +148,15 @@ if __name__ == "__main__":
         # calculate t1:
         has_t1 = False
         for _, row in sub_df.iterrows():
-            trt_difference = abs((trt_date - row['BloodCollectionDate']))
+            trt_difference = row['BloodCollectionDate'] - trt_date
             if two_weeks <= trt_difference <= month_and_half and not has_t1:
                 has_t1 = True
                 blood_summary_df.at[sub_id, 'HasT1'] = True
                 blood_summary_df.at[sub_id, 'T1Date'] = row['BloodCollectionDate']
+                if row['BloodCollectionDate'] == blood_summary_df.at[sub_id, 'T0Date']:
+                    print(f"WARNING: {sub_id} T0 == T1")
             if has_t1:
                 break
-        # todo: need to check that t0 and t1 are different?
         # calculate tprog:
         if pd.notna(prog_date):
             dates = sub_df['BloodCollectionDate'].values
@@ -171,9 +170,34 @@ if __name__ == "__main__":
                     blood_summary_df.at[sub_id, 'IsTprogAlsoT1'] = True
 
     # from the patients that have not progressed
-    # see the number of patients with and without t progression,
+    print(f"- The number of patients that have not progressed and have t1: {sum(blood_summary_df.loc[blood_summary_df['ProgressionDate'].isna(), 'HasT1'])}")
 
-    # of the patients with t progression how many have t1 and how many dont, and how many tprogression == t1
+    # see the number of patients with and without t progression / T1
+    progression_patients = blood_summary_df[blood_summary_df['ProgressionDate'].notna() & blood_summary_df['PassedFilter']]
+    progression_patients['Group'] = None
+    progression_patients.loc[progression_patients['HasT1'] & ~progression_patients['HasTprog'], 'Group'] = 'Has T1 but not Tprog'
+    progression_patients.loc[~progression_patients['HasT1'] & progression_patients['HasTprog'], 'Group'] = 'Has Tprog but not T1'
+    progression_patients.loc[progression_patients['HasT1'] & progression_patients['HasTprog'], 'Group'] = 'Has Both'
+    progression_patients.loc[~progression_patients['HasT1'] & ~progression_patients['HasTprog'], 'Group'] = 'Has Neither'
+
+    group_order = ['Has Tprog but not T1', 'Has Both', 'Has T1 but not Tprog', 'Has Neither']
+    # Count the number of patients in each group
+    group_counts = progression_patients['Group'].value_counts()
+    group_counts = group_counts.loc[group_order]
+    print(group_counts)
+    plt.figure(figsize=(10, 6))
+    plt.bar(group_counts.index, group_counts, color=['blue', 'blue', 'orange', 'orange'])
+    plt.xlabel('Groups of patients with progression', fontsize=14)
+    plt.ylabel('Number of patients in group', fontsize=14)
+    plt.title('Distribution of Patients with Progression By Group', fontsize=16)
+    plt.grid(linestyle='--', alpha=0.7)
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    plt.legend(handles=[plt.Rectangle((0, 0), 1, 1, color='orange', label='No Tprogression'),
+                        plt.Rectangle((0, 0), 1, 1, color='blue', label='Have Tprogression')])
+    plt.savefig('plots/progression_blood_sample_types_distribution.png')
+    print(f"- The number of patient where the Tprogression == T1: {sum(progression_patients['IsTprogAlsoT1'])}")
+
 
     # do twice 1-Tprog patients with t1  2-Tprog patients withput t1:
     #3 histograms:
