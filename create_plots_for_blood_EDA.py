@@ -116,15 +116,62 @@ if __name__ == "__main__":
     plt.yticks(fontsize=12)
     plt.savefig('plots/sample_distribution_filtered.png')
 
+    # add a column to the summary df if the patient has t progression or not and what is the date
+    # add a column to the summary df if the patient has t1 or not and what the date is
+    # add a column to the summary df if the patient's tprog == t1
+    blood_summary_df['PassedFilter'] = False
+    blood_summary_df['HasTprog'] = False
+    blood_summary_df['TprogDate'] = None
+    blood_summary_df['HasT1'] = False
+    blood_summary_df['T1Date'] = None
+    blood_summary_df['IsTprogAlsoT1'] = False
+    filtered_blood_df['IsT0'] = False   # todo: how to classify??
+    filtered_blood_df['IsT1'] = False   # todo: assign
+    filtered_blood_df['IsTprog'] = False   # todo: assign
 
+    blood_summary_df.set_index('SubjectId', inplace=True)
+    # ix = blood_summary_df['SubjectId'].isin(filtered_blood_df['SubjectId'])
+    ix = blood_summary_df.index.isin(filtered_blood_df['SubjectId'])
+    blood_summary_df.loc[ix, 'PassedFilter'] = True
 
-    # get first treatment data
-    # get progression data
+    # how many patients have progressed at all
+    n = len(blood_summary_df[blood_summary_df['PassedFilter'] & blood_summary_df['ProgressionDate'].notna()])
+    print(f"From the filtered data, the number of patients that have progressed are: {n}")
+    n = len(blood_summary_df[blood_summary_df['PassedFilter'] & blood_summary_df['ProgressionDate'].isna()])
+    print(f"From the filtered data, the number of patients that have not progressed at all are: {n}")
 
-    # add a column to the blood df that indicates for each sample if it is T progression or not
+    # fill summary columns:
+    two_weeks = pd.Timedelta(days=14)
+    month_and_half = pd.Timedelta(days=45)
+    month = pd.Timedelta(days=30)
+    for sub_id, sub_df in filtered_blood_df.groupby('SubjectId'):
+        prog_date = blood_summary_df.at[sub_id, 'ProgressionDate']
+        trt_date = blood_summary_df.at[sub_id, 'FirstTreatmentDate']
+        # calculate t1:
+        has_t1 = False
+        for _, row in sub_df.iterrows():
+            trt_difference = abs((trt_date - row['BloodCollectionDate']))
+            if two_weeks <= trt_difference <= month_and_half and not has_t1:
+                has_t1 = True
+                blood_summary_df.at[sub_id, 'HasT1'] = True
+                blood_summary_df.at[sub_id, 'T1Date'] = row['BloodCollectionDate']
+            if has_t1:
+                break
+        # todo: need to check that t0 and t1 are different?
+        # calculate tprog:
+        if pd.notna(prog_date):
+            dates = sub_df['BloodCollectionDate'].values
+            target_date = prog_date + pd.DateOffset(months=1)
+            chosen_date = min(dates, key=lambda x: abs((x - target_date).days))
+            difference = abs((target_date - chosen_date).days)
+            if difference <= month.days:
+                blood_summary_df.at[sub_id, 'HasTprog'] = True
+                blood_summary_df.at[sub_id, 'TprogDate'] = chosen_date
+                if has_t1 and chosen_date == blood_summary_df.at[sub_id, 'T1Date']:
+                    blood_summary_df.at[sub_id, 'IsTprogAlsoT1'] = True
 
+    # from the patients that have not progressed
     # see the number of patients with and without t progression,
-    # and patients with no progression at all (from this dataset)
 
     # of the patients with t progression how many have t1 and how many dont, and how many tprogression == t1
 
