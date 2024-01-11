@@ -23,7 +23,8 @@ def get_progression(clin_dict, full_data):
                                         'End Timefor Plasma Preparation Procedure:': 'EndPrepTime'})
     first_treatment = convert_to_date(blood_df.TreatmentDate[blood_df.Visit == 'PRE'])
     df_dict = parse_response(clin_dict, first_treatment)
-    summary_df = df_dict['Summary'][['PFSDateCurated']]
+    cols = ['PFSDateCurated', 'OSDateCurated']
+    summary_df = df_dict['Summary'][cols]
     summary_df_temp = summary_df.add_prefix('NEW_')
     summary_df_temp = summary_df_temp.reset_index()
     TP_curated_df = pd.read_csv(TP_PFS_CURATION_PATH)
@@ -52,8 +53,23 @@ def get_progression(clin_dict, full_data):
     merged_pfs_df['OLD_TPCurationSummary'] = merged_pfs_df['OLD_TPCurationSummary'].fillna(False)
     merged_pfs_df['OLD_TPCurationREC'] = merged_pfs_df['OLD_TPCurationREC'].fillna(False)
     merged_pfs_df = merged_pfs_df.apply(fill_pfs_date, axis=1)
-    final_df = pd.merge(full_data, merged_pfs_df[['SubjectId', 'PFSDate']])
+    final_df = pd.merge(full_data, merged_pfs_df[['SubjectId', 'PFSDate', 'NEW_OSDateCurated']], on='SubjectId', how='left')
     return final_df
+
+
+def get_progression_duration(row):
+    date_dict = {
+        'ProgressionDate': row['ProgressionDate'],
+        'OSDate': row['OSDate']
+    }
+
+    dates = {k:date for (k, date) in date_dict.items() if date not in [pd.NaT, None, '', 'NaT', np.nan]}
+
+    if dates:  # if date exists, take the minimum
+        min_date_key = min(dates, key=dates.get)
+        row['ProgressionDuration'] = (dates[min_date_key] - row['FirstTreatmentDate']).days
+    return row
+
 
 
 if __name__ == "__main__":
@@ -78,7 +94,8 @@ if __name__ == "__main__":
     # get progression info:
     blood_summary_df = get_progression(clin_dict, blood_summary_df)
     blood_summary_df.rename(columns={'TreatmentDate': 'FirstTreatmentDate', 'PFSDate': 'ProgressionDate',
-                                     'BloodCollectionDate': 'T0Date'}, inplace=True)
+                                     'BloodCollectionDate': 'T0Date', 'NEW_OSDateCurated': 'OSDate'}, inplace=True)
+
 
     # histogram of number of blood samples
     print("According to current NSCLC data from 24.12.23:")
@@ -198,16 +215,112 @@ if __name__ == "__main__":
     plt.savefig('plots/progression_blood_sample_types_distribution.png')
     print(f"- The number of patient where the Tprogression == T1: {sum(progression_patients['IsTprogAlsoT1'])}")
 
+    # calculate pfs durations:
+    blood_summary_df['ProgressionDuration'] = None
+    ix = blood_summary_df['ProgressionDate'].notna() | blood_summary_df['OSDate'].notna()
+    blood_summary_df.loc[ix] = blood_summary_df.loc[ix].apply(get_progression_duration, axis=1)
+    # calculate tprog durations:
+    blood_summary_df['TprogDuration'] = None
+    ix = blood_summary_df['HasTprog']
+    blood_summary_df['TprogDate'] = pd.to_datetime(blood_summary_df['TprogDate'])
+    blood_summary_df['FirstTreatmentDate'] = pd.to_datetime(blood_summary_df['FirstTreatmentDate'])
+    blood_summary_df.loc[ix, 'TprogDuration'] = (blood_summary_df.loc[ix, 'TprogDate'] - blood_summary_df.loc[ix, 'FirstTreatmentDate']).dt.days
+    # delta between distributions TPROG_D - PROG_D
+    blood_summary_df['DurationDelta'] = None
+    blood_summary_df.loc[ix, 'DurationDelta'] = (blood_summary_df.loc[ix, 'TprogDuration'] - blood_summary_df.loc[ix, 'ProgressionDuration'])
 
     # do twice 1-Tprog patients with t1  2-Tprog patients withput t1:
     #3 histograms:
     # tprog duration distibution
     # PFS duration distribution
     # the delta between them distribution
-    # + which of them have essays for t0, t1, tprog
+    # todo: + which of them have essays for t0, t1, tprog
+    for tprog_group in ['with_Tprog_and_T1', 'with_Tprog_without_T1']:
+        if tprog_group == 'with_Tprog_and_T1':
+            cond = blood_summary_df['HasTprog'] & blood_summary_df['HasT1'] & blood_summary_df['PassedFilter']
+        else:
+            cond = blood_summary_df['HasTprog'] & ~blood_summary_df['HasT1'] & blood_summary_df['PassedFilter']
+        duration_df = blood_summary_df[cond]
 
+        # Plot TprogDuration distribution
+        counts_tprog = duration_df['TprogDuration'].value_counts()
+        plt.figure(figsize=(10, 6))
+        plt.hist(counts_tprog.index, weights=counts_tprog, align='left', edgecolor='black')
+        # print(counts_tprog)
+        # print(f"max tprog count: {max(counts_tprog)}")
+        plt.xlabel('Days from first treatment until the Tprog blood collection', fontsize=12)
+        plt.ylabel('Number of Patients', fontsize=14)
+        plt.title("Tprogression Duration Distribution", fontsize=16)
+        plt.grid(linestyle='--', alpha=0.7)
+        plt.xticks(fontsize=10)  # Set ticks to bin edges
+        plt.yticks(fontsize=12)
+        plt.savefig(f"plots/{tprog_group}_Tprogression_duration_distribution.png")
 
-    # look at the amount of patient with eligibility errors, counts for each error? how many patients with no errors?
+        # Plot ProgressionDuration distribution
+        counts_progression = duration_df['ProgressionDuration'].value_counts()
+        plt.figure(figsize=(10, 6))
+        plt.hist(counts_progression.index, weights=counts_progression, align='left',
+                 edgecolor='black')
+        # print(counts_progression)
+        # print(f"max prog count: {max(counts_progression)}")
+        plt.xlabel('Days from first treatment until the progression date', fontsize=12)
+        plt.ylabel('Number of Patients', fontsize=14)
+        plt.title('Progression Duration Distribution', fontsize=16)
+        plt.grid(linestyle='--', alpha=0.7)
+        plt.xticks(fontsize=10)  # Set ticks to bin edges
+        plt.yticks(fontsize=12)
+        plt.savefig(f"plots/{tprog_group}_progression_duration_distribution.png")
+
+        # Plot Delta durations distribution
+        counts_delta = duration_df['DurationDelta'].value_counts()
+        plt.figure(figsize=(10, 6))
+        plt.hist(counts_delta.index, weights=counts_delta, align='left',
+                 edgecolor='black')
+        # print(counts_delta)
+        # print(f"max prog count: {max(counts_delta)}")
+        plt.xlabel('The number of days the Tprog was taken in comparison to the progression date', fontsize=12)
+        plt.ylabel('Number of Patients', fontsize=14)
+        plt.title('Delta of Durations distribution', fontsize=16)
+        plt.grid(linestyle='--', alpha=0.7)
+        plt.xticks(fontsize=10)  # Set ticks to bin edges
+        plt.yticks(fontsize=12)
+        plt.savefig(f"plots/{tprog_group}_delta_duration_distribution.png")
+
+    # look at the amount of patient with eligibility errors:
+    # print(blood_summary_df[blood_summary_df['HasTprog'] & blood_summary_df['PassedFilter']].index)
+    eligibility_df = pd.read_excel('eligibility.xlsx')
+    blood_summary_df = pd.merge(blood_summary_df, eligibility_df, on='SubjectId', how='left')
+    blood_summary_df['IsEligible'] = False
+    ix = blood_summary_df['Eligibility V3'].isna()
+    blood_summary_df.loc[ix, 'IsEligible'] = True
+
+    ix = blood_summary_df['PassedFilter']
+    print(f"The number of patients eligible from cleaned data: {sum(blood_summary_df.loc[ix, 'IsEligible'])}")
+    ix = blood_summary_df['PassedFilter'] & blood_summary_df['ProgressionDate'].notna()
+    print(f"The number of patients eligible from cleaned data with progression: {sum(blood_summary_df.loc[ix, 'IsEligible'])}")
+    ix = blood_summary_df['PassedFilter'] & blood_summary_df['ProgressionDate'].isna()
+    print(f"The number of patients eligible from cleaned data without progression: {sum(blood_summary_df.loc[ix, 'IsEligible'])}")
+    ix = blood_summary_df['PassedFilter'] & blood_summary_df['HasTprog']
+    print(f"The number of patients eligible from cleaned data with Tprogression: {sum(blood_summary_df.loc[ix, 'IsEligible'])}")
+
+    reasons = [
+        "No T0 essay",
+        "Chemo more than 1 month earlier than treatment",
+        "Received neither Mono/Combo/Chemo treatment",
+        "T0 taken after treatment",
+        "Blood collection too early (more than 2 weeks)",
+        "No first treatment",
+        "No second treatment",
+        "Progression before second treatment",
+        "Unknown ECOG",
+        "ECOG >= 3",
+        "Other malignancy detected",
+        "Prior immunotherapy",
+        "Is neither stage 4 or 3C",
+        "No consent",
+        "Not first line or unknown line"
+    ]
+    # todo : make a df that for each reason count how many patients that passed the filter have it and export as excel
 
     # how many patient have tn's that are not t0,1 or prog
     # distribution?
