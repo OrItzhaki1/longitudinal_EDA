@@ -76,7 +76,7 @@ if __name__ == "__main__":
     clin_dict = pd.read_excel(INPUT_PATH, sheet_name=None)
     original_blood_df, treatment_df = parse_blood(clin_dict)
     # filter:
-    original_blood_df = original_blood_df[original_blood_df['Indication'] == 'NSCLC']
+    original_blood_df = original_blood_df[(original_blood_df['Indication'] == 'NSCLC') & ~original_blood_df['SubjectId'].str[:8].isin(['IL-006-9'])]
     blood_df = original_blood_df[original_blood_df['BloodCollectionDate'] != 'Not Done']
     # sort:
     blood_df = blood_df.sort_values(['SubjectId', 'BloodCollectionDate'])
@@ -305,7 +305,7 @@ if __name__ == "__main__":
 
     reasons = [
         "No T0 essay",
-        "Chemo more than 1 month earlier than treatment",
+        "Prior chemo ended 1 months or less before treatment",
         "Received neither Mono/Combo/Chemo treatment",
         "T0 taken after treatment",
         "Blood collection too early (more than 2 weeks)",
@@ -314,13 +314,20 @@ if __name__ == "__main__":
         "Progression before second treatment",
         "Unknown ECOG",
         "ECOG >= 3",
-        "Other malignancy detected",
+        "Other malignancy",
         "Prior immunotherapy",
-        "Is neither stage 4 or 3C",
+        "Stage is not 4 or 3C",
         "No consent",
-        "Not first line or unknown line"
+        "Not first line/Unknown line"
     ]
     # todo : make a df that for each reason count how many patients that passed the filter have it and export as excel
+    reasons_count_df = pd.DataFrame({'Reason': reasons, 'Count': 0})
+    # Count occurrences for each reason
+    for i, reason in enumerate(reasons):
+        reasons_count_df.at[i, 'Count'] = blood_summary_df.loc[blood_summary_df['PassedFilter'], 'Eligibility V3'].str.contains(reason).sum()
+
+    # Export the DataFrame to a CSV file
+    reasons_count_df.to_csv('eligibility_reasons_count.csv', index=False)
 
     # how many patient have tn's that are not t0,1 or prog
     # distribution?
