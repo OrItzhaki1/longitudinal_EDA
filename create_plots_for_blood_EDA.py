@@ -449,33 +449,33 @@ if __name__ == "__main__":
 
     # how many tprog patients have tn's and how many tn samples exist
     cond = blood_summary_df['HasTprog'] & blood_summary_df['PassedFilter']
-    tprog_ids = blood_summary_df[cond].index
-    print(len(tprog_ids))
-    ix = filtered_blood_df['Tnum'].apply(lambda x: isinstance(x, int) and x >= 2) & filtered_blood_df['SubjectId'].isin(tprog_ids)
-    # print(f"The number of Tn samples that exist is: {len(filtered_blood_df[ix])}")
-    # print(f"The number of patients that have at least one Tn sample (other than 0,1,PD): {len(filtered_blood_df.loc[ix, 'SubjectId'].unique())}")
-    #
-    # tn_counts = filtered_blood_df.loc[ix, 'Tnum'].value_counts()
-    # plt.figure(figsize=(10, 6))
-    # plt.bar(tn_counts.index, tn_counts)
-    # plt.xlabel('n', fontsize=14)
-    # plt.ylabel('Number of Patients', fontsize=14)
-    # plt.title('Existing Tn samples', fontsize=16)
-    # plt.grid(linestyle='--', alpha=0.7)
-    # plt.xticks(fontsize=12)
-    # plt.yticks(fontsize=12)
-    # plt.savefig('plots/tn_samples_distribution.png')
-    #
-    # tn_duration_counts = filtered_blood_df.loc[ix, 'Duration'].value_counts()
-    # plt.figure(figsize=(10, 6))
-    # bins = range(int(min(tn_duration_counts.index)), int(max(tn_duration_counts.index)) + 31, 30)
-    # plt.hist(tn_duration_counts.index, bins=bins, weights=tn_duration_counts, edgecolor='black')
-    # plt.xlabel('Duration (days)', fontsize=12)
-    # plt.ylabel('Number of Patients', fontsize=14)
-    # plt.title('Tn Durations', fontsize=16)
-    # plt.grid(linestyle='--', alpha=0.7)
-    # bin_centers = [bin_start + 15 for bin_start in bins[:-1]]
-    # xticks = [bins[0] - 15] + bin_centers
-    # plt.xticks(bins, fontsize=10, rotation=45)
-    # plt.yticks(fontsize=12)
-    # plt.savefig(f"plots/tn_duration_distribution.png")
+    tprog_ids = blood_summary_df.loc[cond, 'SubjectId']
+    print(tprog_ids)
+    ix = (filtered_blood_df['Tnum'].apply(lambda x: isinstance(x, int) and x >= 2)) & (filtered_blood_df['SubjectId'].isin(tprog_ids))
+    print(f"The number of Tn samples out of th Tprog patient: {len(filtered_blood_df[ix])}")
+    print(f"The number of patients out of the Tprog patients that have at least one Tn sample (other than 0,1,PD): {len(filtered_blood_df.loc[ix, 'SubjectId'].unique())}")
+
+    tn_counts = filtered_blood_df.loc[ix, 'Tnum'].value_counts()
+    plt.figure(figsize=(10, 6))
+    plt.bar(tn_counts.index, tn_counts)
+    plt.xlabel('n', fontsize=14)
+    plt.ylabel('Number of Patients', fontsize=14)
+    plt.title('Existing Tn samples', fontsize=16)
+    plt.grid(linestyle='--', alpha=0.7)
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    plt.savefig('plots/tn_tprog_samples_distribution.png')
+
+    tn_duration_counts = filtered_blood_df.loc[ix, 'Duration'].value_counts()
+    plt.figure(figsize=(10, 6))
+    bins = range(0, int(max(tn_duration_counts.index)) + 31, 30)
+    plt.hist(tn_duration_counts.index, bins=bins, weights=tn_duration_counts, edgecolor='black')
+    plt.xlabel('Duration (days)', fontsize=12)
+    plt.ylabel('Number of Patients', fontsize=14)
+    plt.title('Tn Durations', fontsize=16)
+    plt.grid(linestyle='--', alpha=0.7)
+    bin_centers = [bin_start + 15 for bin_start in bins[:-1]]
+    xticks = [bins[0] - 15] + bin_centers
+    plt.xticks(bins, fontsize=10, rotation=45)
+    plt.yticks(fontsize=12)
+    plt.savefig(f"plots/tn_tprog_duration_distribution.png")
