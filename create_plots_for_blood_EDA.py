@@ -194,7 +194,7 @@ if __name__ == "__main__":
             target_date = prog_date + pd.DateOffset(months=1)
             chosen_date = min(dates, key=lambda x: abs((x - target_date).days))
             difference = abs((target_date - chosen_date).days)
-            if difference <= month.days:
+            if difference <= month_and_half.days:
                 blood_summary_df.at[sub_id, 'HasTprog'] = True
                 blood_summary_df.at[sub_id, 'TprogDate'] = chosen_date
                 if has_t1 and chosen_date == blood_summary_df.at[sub_id, 'T1Date']:
@@ -392,21 +392,24 @@ if __name__ == "__main__":
         f"The number of patients eligible from cleaned data with Tprogression: {sum(blood_summary_df.loc[ix, 'IsEligible'])}")
 
     reasons = [
-        "No T0 essay",
-        "Prior chemo ended 1 months or less before treatment",
+        "Prior chemo ended 1 months or less before blood collection",
         "Received neither Mono/Combo/Chemo treatment",
-        "T0 taken after treatment",
-        "Blood collection too early (more than 2 weeks)",
+        "Blood collection too early",
         "No first treatment",
         "No second treatment",
-        "Progression before second treatment",
         "Unknown ECOG",
         "ECOG >= 3",
         "Other malignancy",
         "Prior immunotherapy",
-        "Stage is not 4 or 3C",
+        "Stage is not 4 or 3",
         "No consent",
-        "Not first line/Unknown line"
+        "Not first line",
+        "Unknown line",
+        "Mutation detected",
+        "EGFR patient",
+        "No label",
+        "Unknown treatment",
+        "No T0"
     ]
     # make a df that for each reason count how many patients that passed the filter have it and export as excel
     reasons_count_df = pd.DataFrame({'Reason': reasons, 'Count': 0})
