@@ -84,18 +84,19 @@ if __name__ == "__main__":
 
     #### create summary df
     blood_summary_df = blood_df['SubjectId'].drop_duplicates()
-    # get first treatment info:
-    first_trt = original_blood_df[(original_blood_df['Visit'] == 'PRE') & (original_blood_df['TreatmentDate'].notna())]
-    first_trt = first_trt[['SubjectId', 'TreatmentDate']]
-    blood_summary_df = pd.merge(blood_summary_df, first_trt, on='SubjectId', how='left')
-    # get t0 blood collection info:
-    first_blood = blood_df[(blood_df['Visit'] == 'PRE') & (blood_df['BloodCollectionDate'].notna())]
-    first_blood = first_blood[['SubjectId', 'BloodCollectionDate']]
-    blood_summary_df = pd.merge(blood_summary_df, first_blood, on='SubjectId', how='left')
-    # get progression info:
-    blood_summary_df = get_progression(clin_dict, blood_summary_df)
-    blood_summary_df.rename(columns={'TreatmentDate': 'FirstTreatmentDate', 'PFSDate': 'ProgressionDate',
-                                     'BloodCollectionDate': 'T0Date', 'NEW_OSDateCurated': 'OSDate'}, inplace=True)
+    full_patient_data = pd.read_excel('Data_and_Dicts/2024-02-15_V3_clinical_data_full.xlsx')
+    # # get first treatment info:
+    # first_trt = original_blood_df[(original_blood_df['Visit'] == 'PRE') & (original_blood_df['TreatmentDate'].notna())]
+    # first_trt = first_trt[['SubjectId', 'TreatmentDate']]
+    # blood_summary_df = pd.merge(blood_summary_df, first_trt, on='SubjectId', how='left')
+    # # get t0 blood collection info:
+    # first_blood = blood_df[(blood_df['Visit'] == 'PRE') & (blood_df['BloodCollectionDate'].notna())]
+    # first_blood = first_blood[['SubjectId', 'BloodCollectionDate']]
+    # blood_summary_df = pd.merge(blood_summary_df, first_blood, on='SubjectId', how='left')
+    # # get progression info:
+    # # blood_summary_df = get_progression(clin_dict, blood_summary_df)
+    blood_summary_df = pd.merge(blood_summary_df, full_patient_data[['SubjectId', 'BloodCollectionDate', 'FirstTreatmentDate', 'ProgressionDate', 'OSDate']], on='SubjectId', how='left')
+    blood_summary_df.rename(columns={'BloodCollectionDate': 'T0Date'}, inplace=True)
 
     # histogram of number of blood samples
     print("According to current NSCLC data from 24.12.23:")
@@ -420,6 +421,9 @@ if __name__ == "__main__":
     # Export the DataFrame to a CSV file
     reasons_count_df.to_csv('eligibility_reasons_count.csv', index=False)
 
+    # get tprog patient data
+    full_patient_data[full_patient_data['SubjectId'].isin(blood_summary_df.loc[ix, 'SubjectId'])].to_excel('tprog_patient_data.xlsx', index=False)
+
     # how many patient have tn's and how many tn samples exist
     ix = filtered_blood_df['Tnum'].apply(lambda x: isinstance(x, int) and x >= 2)
     print(f"The number of Tn samples that exist is: {len(filtered_blood_df[ix])}")
@@ -453,7 +457,7 @@ if __name__ == "__main__":
     # how many tprog patients have tn's and how many tn samples exist
     cond = blood_summary_df['HasTprog'] & blood_summary_df['PassedFilter']
     tprog_ids = blood_summary_df.loc[cond, 'SubjectId']
-    print(tprog_ids)
+    # print(tprog_ids)
     ix = (filtered_blood_df['Tnum'].apply(lambda x: isinstance(x, int) and x >= 2)) & (filtered_blood_df['SubjectId'].isin(tprog_ids))
     print(f"The number of Tn samples out of th Tprog patient: {len(filtered_blood_df[ix])}")
     print(f"The number of patients out of the Tprog patients that have at least one Tn sample (other than 0,1,PD): {len(filtered_blood_df.loc[ix, 'SubjectId'].unique())}")
@@ -482,3 +486,30 @@ if __name__ == "__main__":
     plt.xticks(bins, fontsize=10, rotation=45)
     plt.yticks(fontsize=12)
     plt.savefig(f"plots/tn_tprog_duration_distribution.png")
+
+    # add T0 assay information:
+    t0_assayed_df = pd.read_excel('Data_and_Dicts/Prophetic Somascan Sample Dashboard.xlsx', sheet_name='T0Assayed')
+    t0_assayed_df.rename(columns={'subjectID': 'SubjectId'}, inplace=True)
+    blood_summary_df['T0AssayRun_Amir'] = blood_summary_df['SubjectId'].isin(t0_assayed_df['SubjectId'])
+    # add T1 assay information:
+    t1_assayed_df = pd.read_excel('Data_and_Dicts/Prophetic Somascan Sample Dashboard.xlsx', sheet_name='T1 Assayed')
+    blood_summary_df['T1AssayRun_Amir'] = (blood_summary_df['SubjectId'].isin(t1_assayed_df['SubjectId'])) & (blood_summary_df['HasT1'])
+    # add Tprogression assay information:
+    tpd_assayed_df = pd.read_excel('Data_and_Dicts/Prophetic Somascan Sample Dashboard.xlsx', sheet_name='TPD Assayed')
+    tpd_dates_df = pd.read_excel('Data_and_Dicts/Prophetic Somascan Sample Dashboard.xlsx', sheet_name='TPD Blood')
+    tpd_dates_df.rename(columns={'Subject Id': 'SubjectId'}, inplace=True)
+    tpd_assayed_df = pd.merge(tpd_assayed_df, tpd_dates_df, on='SubjectId', how='left')
+    blood_summary_df['PDAssayRun_Amir'] = (blood_summary_df['SubjectId'].isin(tpd_assayed_df['SubjectId'])) & (blood_summary_df['HasTprog'])
+    blood_summary_df = pd.merge(blood_summary_df, tpd_assayed_df[['SubjectId', 'TPD collection date']], on='SubjectId', how='left')
+    blood_summary_df.rename(columns={'TPD collection date': 'TPDDateByAmir'}, inplace=True)
+    blood_summary_df.loc[~blood_summary_df['PDAssayRun_Amir'], 'TPDDateByAmir'] = None
+    # get adat classifications:
+    adat_df = pd.read_csv('Data_and_Dicts/20240214_Adat_data_Samples.csv')
+    adat_df['TIME'] = adat_df['TIME'].fillna('blank')
+    aggregated_details = adat_df.groupby('ID')['TIME'].agg(lambda x: ', '.join(x)).reset_index()
+    blood_summary_df['ID'] = blood_summary_df['SubjectId'].str[3:-6]
+    blood_summary_df = pd.merge(blood_summary_df, aggregated_details, on='ID', how='left')
+    blood_summary_df.rename(columns={'TIME': 'AdatReports'}, inplace=True)
+    blood_summary_df.drop(columns=['ID'], inplace=True)
+    blood_summary_df.to_excel('patient_sample_df.xlsx', index=False)
+    filtered_blood_df.to_excel('blood_sample_df.xlsx', index=False)
