@@ -11,6 +11,7 @@ from cd01_parse_response import parse_response
 
 TP_PFS_CURATION_PATH = 'ManualCuration/12122023_TP_PFS_curation.csv'
 INPUT_PATH = 'OncoHost_20231224_145142.xlsx'
+ADAT_PATH = 'Data_and_Dicts/20240214_Adat_data_Samples.csv'
 
 
 def get_progression(clin_dict, full_data):
@@ -81,6 +82,8 @@ if __name__ == "__main__":
     blood_df = original_blood_df[original_blood_df['BloodCollectionDate'] != 'Not Done']
     # sort:
     blood_df = blood_df.sort_values(['SubjectId', 'BloodCollectionDate'])
+    blood_df.drop(columns=['TreatmentDate', 'TreatmentTime', 'EndPrepTime', 'TimeOnBench', 'BloodCollectionTime',
+                           'BloodCollectionNotes', 'AutoParsingNotes'], inplace=True)
 
     #### create summary df
     blood_summary_df = blood_df['SubjectId'].drop_duplicates()
@@ -95,8 +98,10 @@ if __name__ == "__main__":
     # blood_summary_df = pd.merge(blood_summary_df, first_blood, on='SubjectId', how='left')
     # # get progression info:
     # # blood_summary_df = get_progression(clin_dict, blood_summary_df)
-    blood_summary_df = pd.merge(blood_summary_df, full_patient_data[['SubjectId', 'BloodCollectionDate', 'FirstTreatmentDate', 'ProgressionDate', 'OSDate']], on='SubjectId', how='left')
+    blood_summary_df = pd.merge(blood_summary_df, full_patient_data[['SubjectId', 'BloodCollectionDate', 'FirstTreatmentDate', 'ProgressionDate', 'OSDate', 'Eligibility V3']], on='SubjectId', how='left')
     blood_summary_df.rename(columns={'BloodCollectionDate': 'T0Date'}, inplace=True)
+
+    blood_df = pd.merge(blood_df, full_patient_data[['SubjectId', 'FirstTreatmentDate', 'ProgressionDate', 'OSDate']], on='SubjectId', how='left')
 
     # histogram of number of blood samples
     print("According to current NSCLC data from 24.12.23:")
@@ -116,15 +121,14 @@ if __name__ == "__main__":
     # new histogram with cleaned patients with less than two blood samples and no first treatment found
     # filter for no treatment or t0 dates
     ids_to_keep = blood_summary_df.loc[
-        (blood_summary_df['FirstTreatmentDate'].notna()) & (blood_summary_df['T0Date'].notna()), 'SubjectId']
+        (blood_summary_df['FirstTreatmentDate'].notna()) & (blood_summary_df['T0Date'].notna()) & (blood_summary_df['T0Date'] != 'Not Done'), 'SubjectId']
     filtered_blood_df = blood_df[blood_df['SubjectId'].isin(ids_to_keep)]
     # filter for at least two samples
     sample_counts_filtered = filtered_blood_df['SubjectId'].value_counts()
     sample_counts_filtered = sample_counts_filtered[sample_counts_filtered >= 2]
     filtered_blood_df = blood_df[blood_df['SubjectId'].isin(sample_counts_filtered.index)]
     print(f"- The number of blood collections reported after cleaning: {len(filtered_blood_df)}")
-    print(
-        f"- The number of patients with reported blood collections after cleaning: {len(filtered_blood_df['SubjectId'].unique())}")
+    print(f"- The number of patients with reported blood collections after cleaning: {len(filtered_blood_df['SubjectId'].unique())}")
     plt.figure(figsize=(10, 6))
     plt.hist(sample_counts_filtered, bins=range(2, sample_counts_filtered.max() + 2), align='left', edgecolor='black')
     plt.xlabel('Blood Sample Count', fontsize=14)
@@ -146,6 +150,8 @@ if __name__ == "__main__":
     blood_summary_df['IsTprogAlsoT1'] = False
     blood_summary_df['IsTprogAlsoT0'] = False
     filtered_blood_df['Tnum'] = None
+    filtered_blood_df['IsTprog'] = None
+    filtered_blood_df['Duration'] = None
 
     blood_summary_df.set_index('SubjectId', inplace=True)
     ix = blood_summary_df.index.isin(filtered_blood_df['SubjectId'])
@@ -167,10 +173,8 @@ if __name__ == "__main__":
         print("WARNING: Subjects with multiple rows with T0:", subjects_with_multiple_rows)
 
     # fill summary columns and #T:
-    two_weeks = pd.Timedelta(days=14)
-    month_and_half = pd.Timedelta(days=45)
-    month = pd.Timedelta(days=30)
-    filtered_blood_df['Duration'] = None
+    months_and_half_days  = 45
+    two_weeks_days = 14
     for sub_id, sub_df in filtered_blood_df.groupby('SubjectId'):
         prog_date = blood_summary_df.at[sub_id, 'ProgressionDate']
         trt_date = blood_summary_df.at[sub_id, 'FirstTreatmentDate']
@@ -178,8 +182,8 @@ if __name__ == "__main__":
         has_t1 = False
         count = 2
         for index, row in sub_df.iterrows():
-            trt_difference = row['BloodCollectionDate'] - trt_date
-            if two_weeks <= trt_difference <= month_and_half and not has_t1:
+            trt_difference = (row['BloodCollectionDate'] - trt_date).days
+            if two_weeks_days <= trt_difference <= months_and_half_days and not has_t1:
                 has_t1 = True
                 blood_summary_df.at[sub_id, 'HasT1'] = True
                 blood_summary_df.at[sub_id, 'T1Date'] = row['BloodCollectionDate']
@@ -192,10 +196,10 @@ if __name__ == "__main__":
         if pd.notna(prog_date):
             # progressed
             dates = sub_df['BloodCollectionDate'].values
-            target_date = prog_date + pd.DateOffset(months=1)
+            target_date = prog_date
             chosen_date = min(dates, key=lambda x: abs((x - target_date).days))
             difference = abs((target_date - chosen_date).days)
-            if difference <= month_and_half.days:
+            if difference <= months_and_half_days:  # had tprog
                 blood_summary_df.at[sub_id, 'HasTprog'] = True
                 blood_summary_df.at[sub_id, 'TprogDate'] = chosen_date
                 if has_t1 and chosen_date == blood_summary_df.at[sub_id, 'T1Date']:
@@ -205,28 +209,29 @@ if __name__ == "__main__":
                 # calculate durations for dates before the Tprog:
                 for index, row in sub_df.iterrows():
                     if row['BloodCollectionDate'] == chosen_date:
-                        filtered_blood_df.loc[index, 'Tnum'] = 'PD'
-                    elif row['BloodCollectionDate'] > chosen_date:
-                        filtered_blood_df.loc[index, 'Tnum'] = '> PD'
-                    else:
-                        trt_difference = row['BloodCollectionDate'] - trt_date
-                        filtered_blood_df.loc[index, 'Duration'] = trt_difference.days
-                        x = filtered_blood_df.loc[index, 'Tnum']
-                        if x == None:
-                            filtered_blood_df.loc[index, 'Tnum'] = count
-                            count = count + 1
+                        # filtered_blood_df.loc[index, 'Tnum'] = 'PD'
+                        filtered_blood_df.loc[index, 'IsTprog'] = 'PD'
+                    # elif row['BloodCollectionDate'] > chosen_date:
+                    #     filtered_blood_df.loc[index, 'Tnum'] = '> PD'
+                    # else:
+                    trt_difference = row['BloodCollectionDate'] - trt_date
+                    filtered_blood_df.loc[index, 'Duration'] = trt_difference.days
+                    x = filtered_blood_df.loc[index, 'Tnum']
+                    if x == None:
+                        filtered_blood_df.loc[index, 'Tnum'] = count
+                        count = count + 1
             else:  # has progression but not tprog
                 # calculate durations for dates before the progression:
                 for index, row in sub_df.iterrows():
-                    if row['BloodCollectionDate'] >= prog_date:
-                        filtered_blood_df.loc[index, 'Tnum'] = ' >= PD'
-                    else:
-                        trt_difference = row['BloodCollectionDate'] - trt_date
-                        filtered_blood_df.loc[index, 'Duration'] = trt_difference.days
-                        x = filtered_blood_df.loc[index, 'Tnum']
-                        if x == None:
-                            filtered_blood_df.loc[index, 'Tnum'] = count
-                            count = count + 1
+                    # if row['BloodCollectionDate'] >= prog_date:
+                    #     filtered_blood_df.loc[index, 'Tnum'] = ' >= PD'
+                    # else:
+                    trt_difference = row['BloodCollectionDate'] - trt_date
+                    filtered_blood_df.loc[index, 'Duration'] = trt_difference.days
+                    x = filtered_blood_df.loc[index, 'Tnum']
+                    if x == None:
+                        filtered_blood_df.loc[index, 'Tnum'] = count
+                        count = count + 1
         else:
             # calculate durations for all dates (no progression at all):
             sub_df['BloodCollectionDate'] = pd.to_datetime(sub_df['BloodCollectionDate'])
@@ -237,7 +242,7 @@ if __name__ == "__main__":
                     filtered_blood_df.loc[index, 'Tnum'] = count
                     count = count + 1
 
-    # filtered_blood_df.to_excel('checking.xlsx')
+    filtered_blood_df['TotalSampleCount'] = filtered_blood_df.groupby('SubjectId')['SubjectId'].transform('count')
 
     # from the patients that have not progressed
     print(f"- The number of patients that have not progressed and have t1: {sum(blood_summary_df.loc[blood_summary_df['ProgressionDate'].isna(), 'HasT1'])}")
@@ -338,7 +343,10 @@ if __name__ == "__main__":
         # Plot Delta durations distribution
         counts_delta = duration_df['DurationDelta'].value_counts()
         plt.figure(figsize=(10, 6))
-        bins = range(int(min(counts_delta.index)), int(max(counts_delta.index)) + 31, 30)
+        min_delta = min(duration_df['DurationDelta'])
+        max_delta = max(duration_df['DurationDelta'])
+        bin_delta = 10
+        bins = range(int((min_delta//bin_delta)*bin_delta), int(max_delta//(bin_delta + 1)*bin_delta + 1), bin_delta)
         plt.hist(counts_delta.index, bins=bins, weights=counts_delta, edgecolor='black')
         plt.xlabel('Delta Tprog/Progression (days)', fontsize=12)
         plt.ylabel('Number of Patients', fontsize=14)
@@ -352,30 +360,31 @@ if __name__ == "__main__":
 
     # compare tprog duration with controls
     duration_df = blood_summary_df[blood_summary_df['HasTprog'] & blood_summary_df['PassedFilter']]
-    counts_tprog = duration_df.loc[duration_df['TprogDuration'] > 0, 'TprogDuration'].value_counts()
+    # counts_tprog = duration_df.loc[duration_df['TprogDuration'] > 0, 'TprogDuration'].value_counts()
+    counts_tprog = duration_df['TprogDuration'].value_counts()
     ix = filtered_blood_df['Duration'].notna() & (filtered_blood_df['Duration'] > 0) & (
-                filtered_blood_df['Duration'] <= int(max(counts_tprog.index)))
+                filtered_blood_df['Duration'] <= int(max(counts_tprog.index))) & filtered_blood_df['IsTprog'].isna()
     positive_control_counts = filtered_blood_df.loc[ix, 'Duration'].value_counts()
     plt.figure(figsize=(10, 6))
-    bins = range(0, int(max(counts_tprog.index)) + 31, 30)
+    bins = range(int(min(counts_tprog.index)), int(max(counts_tprog.index)) + 31, 30)
     plt.hist(positive_control_counts.index, bins=bins, label='Control', weights=positive_control_counts,
              edgecolor='black')
     plt.hist(counts_tprog.index, bins=bins, label='Tprogression', weights=counts_tprog, edgecolor='black')
     plt.xlabel('Duration (days)', fontsize=12)
     plt.ylabel('Number of Patients', fontsize=14)
-    plt.title('Positive Durations Distribution', fontsize=16)
+    plt.title('Durations Distribution', fontsize=16)
     plt.grid(linestyle='--', alpha=0.7)
     bin_centers = [bin_start + 15 for bin_start in bins[:-1]]
     xticks = [bins[0] - 15] + bin_centers
     plt.xticks(bins, fontsize=9, rotation=45)
     plt.yticks(fontsize=12)
-    plt.ylim(0, 90)
+    plt.ylim(0, 100)
     plt.legend()
     plt.savefig(f"plots/tprog_control_duration_distribution.png")
 
     # look at the amount of patient with eligibility errors:
-    eligibility_df = pd.read_excel('eligibility.xlsx')
-    blood_summary_df = pd.merge(blood_summary_df, eligibility_df, on='SubjectId', how='left')
+    # eligibility_df = pd.read_excel('eligibility.xlsx')
+    # blood_summary_df = pd.merge(blood_summary_df, eligibility_df, on='SubjectId', how='left')
     blood_summary_df['IsEligible'] = False
     ix = blood_summary_df['Eligibility V3'].isna()
     blood_summary_df.loc[ix, 'IsEligible'] = True
@@ -422,7 +431,7 @@ if __name__ == "__main__":
     reasons_count_df.to_csv('eligibility_reasons_count.csv', index=False)
 
     # get tprog patient data
-    full_patient_data[full_patient_data['SubjectId'].isin(blood_summary_df.loc[ix, 'SubjectId'])].to_excel('tprog_patient_data.xlsx', index=False)
+    full_patient_data[full_patient_data['SubjectId'].isin(blood_summary_df[ix].index)].to_excel('tprog_patient_data.xlsx', index=False)
 
     # how many patient have tn's and how many tn samples exist
     ix = filtered_blood_df['Tnum'].apply(lambda x: isinstance(x, int) and x >= 2)
@@ -456,7 +465,7 @@ if __name__ == "__main__":
 
     # how many tprog patients have tn's and how many tn samples exist
     cond = blood_summary_df['HasTprog'] & blood_summary_df['PassedFilter']
-    tprog_ids = blood_summary_df.loc[cond, 'SubjectId']
+    tprog_ids = blood_summary_df[cond].index
     # print(tprog_ids)
     ix = (filtered_blood_df['Tnum'].apply(lambda x: isinstance(x, int) and x >= 2)) & (filtered_blood_df['SubjectId'].isin(tprog_ids))
     print(f"The number of Tn samples out of th Tprog patient: {len(filtered_blood_df[ix])}")
@@ -490,26 +499,30 @@ if __name__ == "__main__":
     # add T0 assay information:
     t0_assayed_df = pd.read_excel('Data_and_Dicts/Prophetic Somascan Sample Dashboard.xlsx', sheet_name='T0Assayed')
     t0_assayed_df.rename(columns={'subjectID': 'SubjectId'}, inplace=True)
-    blood_summary_df['T0AssayRun_Amir'] = blood_summary_df['SubjectId'].isin(t0_assayed_df['SubjectId'])
+    blood_summary_df['T0AssayRun_Amir'] = blood_summary_df.index.isin(t0_assayed_df['SubjectId'])
     # add T1 assay information:
     t1_assayed_df = pd.read_excel('Data_and_Dicts/Prophetic Somascan Sample Dashboard.xlsx', sheet_name='T1 Assayed')
-    blood_summary_df['T1AssayRun_Amir'] = (blood_summary_df['SubjectId'].isin(t1_assayed_df['SubjectId'])) & (blood_summary_df['HasT1'])
+    blood_summary_df['T1AssayRun_Amir'] = (blood_summary_df.index.isin(t1_assayed_df['SubjectId'])) & (blood_summary_df['HasT1'])
     # add Tprogression assay information:
     tpd_assayed_df = pd.read_excel('Data_and_Dicts/Prophetic Somascan Sample Dashboard.xlsx', sheet_name='TPD Assayed')
     tpd_dates_df = pd.read_excel('Data_and_Dicts/Prophetic Somascan Sample Dashboard.xlsx', sheet_name='TPD Blood')
     tpd_dates_df.rename(columns={'Subject Id': 'SubjectId'}, inplace=True)
     tpd_assayed_df = pd.merge(tpd_assayed_df, tpd_dates_df, on='SubjectId', how='left')
-    blood_summary_df['PDAssayRun_Amir'] = (blood_summary_df['SubjectId'].isin(tpd_assayed_df['SubjectId'])) & (blood_summary_df['HasTprog'])
+    blood_summary_df['PDAssayRun_Amir'] = (blood_summary_df.index.isin(tpd_assayed_df['SubjectId'])) & (blood_summary_df['HasTprog'])
     blood_summary_df = pd.merge(blood_summary_df, tpd_assayed_df[['SubjectId', 'TPD collection date']], on='SubjectId', how='left')
     blood_summary_df.rename(columns={'TPD collection date': 'TPDDateByAmir'}, inplace=True)
     blood_summary_df.loc[~blood_summary_df['PDAssayRun_Amir'], 'TPDDateByAmir'] = None
     # get adat classifications:
-    adat_df = pd.read_csv('Data_and_Dicts/20240214_Adat_data_Samples.csv')
+    adat_df = pd.read_csv(ADAT_PATH)
     adat_df['TIME'] = adat_df['TIME'].fillna('blank')
     aggregated_details = adat_df.groupby('ID')['TIME'].agg(lambda x: ', '.join(x)).reset_index()
     blood_summary_df['ID'] = blood_summary_df['SubjectId'].str[3:-6]
     blood_summary_df = pd.merge(blood_summary_df, aggregated_details, on='ID', how='left')
     blood_summary_df.rename(columns={'TIME': 'AdatReports'}, inplace=True)
     blood_summary_df.drop(columns=['ID'], inplace=True)
-    blood_summary_df.to_excel('patient_sample_df.xlsx', index=False)
+
+    filtered_blood_df = pd.merge(filtered_blood_df, blood_summary_df[['SubjectId', 'HasT1', 'HasTprog']], on='SubjectId', how='left')
+    blood_summary_df.to_excel('patient_summary_df.xlsx', index=False)
     filtered_blood_df.to_excel('blood_sample_df.xlsx', index=False)
+    print("\nNOTE: blood sample data went from Viedoc->Analysis without manual curation\n")
+
